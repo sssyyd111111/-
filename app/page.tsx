@@ -29,7 +29,7 @@ export default function HomePage() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <div className="flex h-screen flex-col">
+        <div className="relative flex h-screen flex-col">
           {/* 顶部栏：侧边栏触发器 */}
           <header className="flex h-12 items-center gap-2 border-b px-4">
             <SidebarTrigger className="h-8 w-8" />
@@ -79,6 +79,22 @@ export default function HomePage() {
               <NoteInput />
             </div>
           </div>
+
+          {/* Toast 位置由 globals.css 中 [data-sonner-toaster] 相对本栏定位 */}
+          <Toaster
+            position="top-center"
+            duration={1500}
+            closeButton={false}
+            richColors={false}
+            toastOptions={{
+              classNames: {
+                toast:
+                  '!justify-center !text-center !bg-background/75 !backdrop-blur-md !border-border/40 !shadow-lg',
+                title: '!text-center !w-full',
+                description: '!text-center !w-full',
+              },
+            }}
+          />
         </div>
       </SidebarInset>
 
@@ -86,9 +102,6 @@ export default function HomePage() {
       {viewerOpen && currentNoteId && (
         <NoteViewer noteId={currentNoteId} onClose={closeViewer} />
       )}
-
-      {/* Toast 通知 */}
-      <Toaster position="bottom-center" />
     </SidebarProvider>
   )
 }

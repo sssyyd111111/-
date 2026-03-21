@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   X,
   Lightbulb,
@@ -13,11 +13,18 @@ import {
   Sparkles,
   Link,
   FileText,
+  Plus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +40,9 @@ import { useNoteStore } from '@/lib/store'
 import { Note } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+
+const MAX_TAGS = 6
+const MIN_TAGS = 1
 
 interface NoteViewerProps {
   noteId: string
@@ -50,9 +60,14 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
     markAsDone,
     updateStatus,
     filterByTag,
+    getAllTags,
   } = useNoteStore()
 
   const [userNotes, setUserNotes] = useState('')
+  const [titleDraft, setTitleDraft] = useState('')
+  const [tagsDraft, setTagsDraft] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
+  const [tagPopoverOpen, setTagPopoverOpen] = useState(false)
   const [isHighlightMode, setIsHighlightMode] = useState(false)
   const [navigationIds, setNavigationIds] = useState<string[]>([])
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
@@ -61,6 +76,11 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
     status: Note['status']
     isSpark: boolean
   } | null>(null)
+  const navInitedRef = useRef(false)
+  /** 避免首屏 navigationIds 尚未写入时 pool 为空误触「全部完成」 */
+  const poolHadNotesRef = useRef(false)
+
+  const allTags = getAllTags()
 
   const sourceNote = notes.find((n) => n.id === noteId) || null
 
@@ -80,13 +100,8 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
     }
   }, [noteId, notes])
 
-  // 打开时确定可左右切换的笔记范围，避免因状态变化导致导航集合抖动
-  useEffect(() => {
-    if (!sourceNote) {
-      setNavigationIds([])
-      return
-    }
-
+  const buildCandidateIds = useCallback((): string[] => {
+    if (!sourceNote) return []
     const seed = navigationSeedRef.current
     const seedStatus = seed?.status || sourceNote.status
     const seedIsSpark = seed?.isSpark ?? sourceNote.isSpark
@@ -134,36 +149,62 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
     if (!candidates.some((n) => n.id === sourceNote.id)) {
       candidates = [sourceNote, ...candidates]
     }
-    setNavigationIds(candidates.map((n) => n.id))
-  }, [noteId, notes, currentView, selectedTag, filterByTag, sourceNote])
+    return candidates.map((n) => n.id)
+  }, [sourceNote, notes, currentView, selectedTag, filterByTag])
 
-  const viewableNotes = useMemo(() => {
-    if (navigationIds.length === 0) return []
-    const noteMap = new Map(notes.map((n) => [n.id, n]))
-    return navigationIds
-      .map((id) => noteMap.get(id))
-      .filter((note): note is Note => Boolean(note && !note.isDeleted))
-  }, [navigationIds, notes])
-
-  // 当前笔记索引
-  const currentIndex = viewableNotes.findIndex((n) => n.id === noteId)
-  const currentNote = viewableNotes[currentIndex]
-
-  // 上一条/下一条
-  const prevNote = currentIndex > 0 ? viewableNotes[currentIndex - 1] : null
-  const nextNote =
-    currentIndex < viewableNotes.length - 1
-      ? viewableNotes[currentIndex + 1]
-      : null
-
-  // 初始化用户笔记
   useEffect(() => {
-    if (currentNote) {
-      setUserNotes(currentNote.userNotes)
-    }
-  }, [currentNote])
+    if (!sourceNote || navInitedRef.current) return
+    navInitedRef.current = true
+    setNavigationIds(buildCandidateIds())
+  }, [sourceNote, buildCandidateIds])
 
-  // 打开笔记时更新状态
+  const matchesSeedPool = useCallback(
+    (note: Note) => {
+      const seed = navigationSeedRef.current
+      if (!seed) return true
+      const seedStatus = seed.status
+      const seedIsSpark = seed.isSpark
+
+      if (note.isDeleted) {
+        return currentView === 'trash'
+      }
+
+      if (seedStatus === 'inbox' || seedStatus === 'active' || seedStatus === 'loading') {
+        return ['inbox', 'active', 'loading'].includes(note.status)
+      }
+      if (seedStatus === 'processing') {
+        return note.status === 'processing'
+      }
+      if (seedIsSpark && seedStatus === 'done') {
+        return note.isSpark && note.status === 'done'
+      }
+      switch (currentView) {
+        case 'tag':
+          return selectedTag ? filterByTag(selectedTag).some((n) => n.id === note.id) : false
+        case 'trash':
+          return note.isDeleted
+        default:
+          return true
+      }
+    },
+    [currentView, selectedTag, filterByTag]
+  )
+
+  const poolFilteredNotes = useMemo(() => {
+    return navigationIds
+      .map((id) => notes.find((n) => n.id === id))
+      .filter((note): note is Note => Boolean(note && !note.isDeleted && matchesSeedPool(note)))
+  }, [navigationIds, notes, matchesSeedPool])
+
+  const currentNote = notes.find((n) => n.id === noteId)
+
+  useEffect(() => {
+    if (!currentNote) return
+    setUserNotes(currentNote.userNotes)
+    setTitleDraft(currentNote.title)
+    setTagsDraft([...currentNote.tags])
+  }, [currentNote?.id])
+
   useEffect(() => {
     if (currentNote && currentNote.status === 'inbox') {
       updateNote(currentNote.id, {
@@ -172,11 +213,32 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
     }
   }, [currentNote?.id])
 
+  /** 当前笔记已不在「池中」且仍有其它可浏览项时，切到第一个仍在池中的 */
+  useEffect(() => {
+    if (!currentNote || poolFilteredNotes.length === 0) return
+    if (!poolFilteredNotes.some((n) => n.id === noteId)) {
+      const target = poolFilteredNotes[0]
+      if (target) {
+        useNoteStore.getState().openViewer(target.id)
+      }
+    }
+  }, [poolFilteredNotes, noteId, currentNote])
+
+  /** 仅在环里曾经有过可展示笔记后，池变空才提示「全部完成」（排除首次打开前的空池） */
+  useEffect(() => {
+    if (poolFilteredNotes.length > 0) {
+      poolHadNotesRef.current = true
+      return
+    }
+    if (!poolHadNotesRef.current) return
+    toast.success('全部处理完成，获得清爽大脑~')
+    onClose()
+  }, [poolFilteredNotes.length, onClose])
+
   if (!currentNote) {
     return null
   }
 
-  // 命中关键交互时，inbox 立即流转 processing
   const moveToProcessingIfInbox = () => {
     if (currentNote.status === 'inbox') {
       updateStatus(currentNote.id, 'processing')
@@ -186,7 +248,6 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
     }
   }
 
-  // 跳转原链接
   const handleOpenSource = () => {
     if (currentNote.sourceUrl) {
       moveToProcessingIfInbox()
@@ -201,73 +262,119 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
     }
   }
 
-  // 切换灵感标记
   const handleToggleSpark = () => {
     markAsSpark(currentNote.id, !currentNote.isSpark)
     moveToProcessingIfInbox()
   }
 
-  // 标记已消化
+  const handleSaveTitle = () => {
+    const t = titleDraft.trim()
+    if (t && t !== currentNote.title) {
+      updateNote(currentNote.id, { title: t })
+    }
+  }
+
+  const commitTags = (next: string[]) => {
+    const normalized = next.map((x) => x.trim()).filter(Boolean)
+    if (normalized.length < MIN_TAGS) {
+      setTagsDraft([...currentNote.tags])
+      return
+    }
+    if (normalized.length > MAX_TAGS) {
+      setTagsDraft([...currentNote.tags])
+      return
+    }
+    updateNote(currentNote.id, { tags: normalized })
+    setTagsDraft(normalized)
+    moveToProcessingIfInbox()
+  }
+
+  const removeTag = (tag: string) => {
+    if (tagsDraft.length === 1) {
+      commitTags(['未归类'])
+      return
+    }
+    const next = tagsDraft.filter((t) => t !== tag)
+    commitTags(next)
+  }
+
+  const addTag = (raw: string) => {
+    const tag = raw.trim().replace(/^#+\s*/, '')
+    if (!tag) return
+    if (tagsDraft.includes(tag)) {
+      setTagInput('')
+      setTagPopoverOpen(false)
+      return
+    }
+    if (tagsDraft.length >= MAX_TAGS) {
+      return
+    }
+    commitTags([...tagsDraft, tag])
+    setTagInput('')
+    setTagPopoverOpen(false)
+  }
+
   const handleMarkDone = () => {
-    // 保存用户笔记
     if (userNotes !== currentNote.userNotes) {
       updateNote(currentNote.id, { userNotes })
     }
+    const list = poolFilteredNotes
+    const idx = list.findIndex((n) => n.id === noteId)
+
+    if (list.length <= 1) {
+      markAsDone(currentNote.id)
+      setNavigationIds((prev) => prev.filter((id) => id !== currentNote.id))
+      return
+    }
+
+    const nextInRing = list[(idx + 1) % list.length]!
     markAsDone(currentNote.id)
-    toast.success('已标记为完成')
-    onClose()
+    setNavigationIds((prev) => prev.filter((id) => id !== currentNote.id))
+    setSlideDirection('right')
+    useNoteStore.getState().openViewer(nextInRing.id)
   }
 
-  // 删除笔记
   const handleDelete = () => {
     deleteNote(currentNote.id)
-    toast.success('已移至回收站')
     onClose()
   }
 
-  // 保存用户笔记
   const handleNotesChange = (value: string) => {
     setUserNotes(value)
     moveToProcessingIfInbox()
   }
 
-  // 保存笔记内容
   const handleSaveNotes = () => {
     if (userNotes !== currentNote.userNotes) {
       updateNote(currentNote.id, { userNotes })
-      toast.success('笔记已保存')
     }
   }
 
-  // 导航到上一条
   const goToPrev = () => {
-    if (prevNote) {
-      setSlideDirection('left')
-      handleSaveNotes()
-      useNoteStore.getState().openViewer(prevNote.id)
-    } else {
-      toast.info('已经是第一条')
-    }
+    if (poolFilteredNotes.length === 0) return
+    setSlideDirection('left')
+    handleSaveNotes()
+    const i = poolFilteredNotes.findIndex((n) => n.id === noteId)
+    const l = poolFilteredNotes.length
+    const prev = poolFilteredNotes[(i - 1 + l) % l]!
+    useNoteStore.getState().openViewer(prev.id)
   }
 
-  // 导航到下一条
   const goToNext = () => {
-    if (nextNote) {
-      setSlideDirection('right')
-      handleSaveNotes()
-      useNoteStore.getState().openViewer(nextNote.id)
-    } else {
-      toast.info('已经全部查看完成！')
-    }
+    if (poolFilteredNotes.length === 0) return
+    setSlideDirection('right')
+    handleSaveNotes()
+    const i = poolFilteredNotes.findIndex((n) => n.id === noteId)
+    const l = poolFilteredNotes.length
+    const next = poolFilteredNotes[(i + 1) % l]!
+    useNoteStore.getState().openViewer(next.id)
   }
 
-  // 关闭时提交状态变化
   const handleClose = () => {
     handleSaveNotes()
     onClose()
   }
 
-  // 获取类型图标
   const getTypeIcon = () => {
     switch (currentNote.type) {
       case 'url':
@@ -279,12 +386,12 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
     }
   }
 
+  const showSideNav = poolFilteredNotes.length > 1
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      {/* 层叠卡片容器 */}
       <div className="relative flex h-[85vh] w-full max-w-[900px] items-center px-4">
-        {/* 左侧卡片预览（上一条） */}
-        {prevNote && (
+        {showSideNav && (
           <div
             onClick={goToPrev}
             className="absolute left-0 z-0 h-[75vh] w-16 cursor-pointer opacity-60 transition-all duration-300 hover:opacity-80"
@@ -297,7 +404,6 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
           </div>
         )}
 
-        {/* 主卡片 - 宽度800px，内边距48px */}
         <Card
           key={currentNote.id}
           className={cn(
@@ -307,7 +413,6 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
             slideDirection === 'right' && 'slide-in-from-right-6'
           )}
         >
-          {/* 顶部工具栏 */}
           <div className="flex items-center justify-between border-b p-4">
             <Button variant="ghost" size="icon" onClick={handleClose}>
               <X className="h-4 w-4" />
@@ -331,7 +436,7 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
                 size="icon"
                 onClick={() => {
                   setIsHighlightMode(!isHighlightMode)
-                  handleInteraction()
+                  moveToProcessingIfInbox()
                 }}
                 title="高亮勾画"
               >
@@ -345,31 +450,88 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
             </div>
           </div>
 
-          {/* 内容区域 - 内边距48px */}
           <div className="flex-1 overflow-y-auto px-12 py-8">
-            {/* 标题 */}
             <div className="mb-4 flex items-start gap-3">
               <div className="mt-1 flex-shrink-0">{getTypeIcon()}</div>
-              <h1 className="text-xl font-semibold leading-tight text-foreground">
-                {currentNote.title}
-              </h1>
+              <Input
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={handleSaveTitle}
+                className="border-transparent bg-transparent text-3xl font-semibold leading-tight text-foreground shadow-none hover:bg-muted/30 focus-visible:ring-1"
+              />
             </div>
 
-            {/* 标签 */}
-            <div className="mb-4 flex flex-wrap gap-1.5">
-              {currentNote.tags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-xs">
+            <div className="mb-4 flex flex-wrap items-center gap-1.5">
+              {tagsDraft.map((tag) => (
+                <Badge
+                  key={tag}
+                  variant="secondary"
+                  className="gap-1 pr-1 text-xs"
+                >
                   # {tag}
+                  <button
+                    type="button"
+                    className="rounded p-0.5 hover:bg-muted"
+                    onClick={() => removeTag(tag)}
+                    aria-label={`移除标签 ${tag}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </Badge>
               ))}
+              {tagsDraft.length < MAX_TAGS && (
+                <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs">
+                      <Plus className="h-3 w-3" />
+                      标签
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-2" align="start">
+                    <div className="space-y-2">
+                      <Input
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            addTag(tagInput)
+                          } else if (e.key === 'Escape') {
+                            setTagInput('')
+                            setTagPopoverOpen(false)
+                          }
+                        }}
+                        placeholder="输入新标签后回车"
+                        className="h-8 text-xs"
+                        autoFocus
+                      />
+                      <div className="max-h-44 overflow-y-auto rounded-md border p-1">
+                        {allTags
+                          .filter((tag) =>
+                            tag.toLowerCase().includes(tagInput.trim().toLowerCase())
+                          )
+                          .filter((tag) => !tagsDraft.includes(tag))
+                          .map((tag) => (
+                            <button
+                              key={tag}
+                              type="button"
+                              onClick={() => addTag(tag)}
+                              className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent"
+                            >
+                              # {tag}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
 
-            {/* 跳转原链接 */}
             {currentNote.type === 'url' && currentNote.sourceUrl && (
               <Button
-                variant="outline"
                 size="sm"
-                className="mb-4 gap-2"
+                className="mb-4 gap-2 bg-blue-600 text-white hover:bg-blue-700"
                 onClick={handleOpenSource}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
@@ -389,7 +551,6 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
               </Button>
             )}
 
-            {/* AI 摘要 */}
             {currentNote.content && (
               <div className="mb-6">
                 <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -398,7 +559,7 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
                 </h3>
                 <div
                   className={cn(
-                    'rounded-lg bg-muted/50 p-4 text-sm leading-relaxed',
+                    'rounded-lg bg-[#e6f7f2]/95 p-4 text-sm leading-relaxed text-foreground',
                     isHighlightMode && 'selection:bg-yellow-200'
                   )}
                 >
@@ -407,7 +568,6 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
               </div>
             )}
 
-            {/* 用户笔记 */}
             <div className="mb-6">
               <h3 className="mb-2 text-sm font-medium text-muted-foreground">
                 我的笔记
@@ -422,12 +582,8 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
             </div>
           </div>
 
-          {/* 底部操作区 */}
           <div className="border-t p-4">
-            <Button
-              className="mb-3 w-full gap-2"
-              onClick={handleMarkDone}
-            >
+            <Button className="mb-3 w-full gap-2" onClick={handleMarkDone}>
               <Check className="h-4 w-4" />
               已消化
             </Button>
@@ -459,8 +615,7 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
           </div>
         </Card>
 
-        {/* 右侧卡片预览（下一条） */}
-        {nextNote && (
+        {showSideNav && (
           <div
             onClick={goToNext}
             className="absolute right-0 z-0 h-[75vh] w-16 cursor-pointer opacity-60 transition-all duration-300 hover:opacity-80"

@@ -209,13 +209,19 @@ export function NoteInput() {
 
   const allTags = getAllTags()
 
+  /** 未手动选标签时默认「未归类」 */
+  const effectiveTags = useMemo(
+    () => (selectedTags.length > 0 ? selectedTags : ['未归类']),
+    [selectedTags]
+  )
+
   // 获取推荐标签（词频前4）
   const tagFrequency = getTagFrequency()
   const recommendedTags = Array.from(tagFrequency.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4)
     .map(([tag]) => tag)
-    .filter((tag) => !selectedTags.includes(tag))
+    .filter((tag) => !effectiveTags.includes(tag))
 
   // 判断输入类型
   const detectType = useCallback((text: string): NoteType => {
@@ -314,7 +320,7 @@ export function NoteInput() {
           readTime: '',
           userNotes: '',
           sourceUrl: normalizedInputUrl,
-          tags: selectedTags,
+          tags: effectiveTags,
           status: 'loading',
           isSpark: false,
           isDeleted: false,
@@ -339,7 +345,7 @@ export function NoteInput() {
           readTime: '',
           userNotes: rawText,
           sourceUrl: '',
-          tags: selectedTags,
+          tags: effectiveTags,
           status: 'loading',
           isSpark: true,
           isDeleted: false,
@@ -364,7 +370,7 @@ export function NoteInput() {
           content: file.extractedText,
           userNotes: file.extractedText,
           sourceUrl: file.dataUrl,
-          tags: selectedTags,
+          tags: effectiveTags,
           status: 'inbox',
           isSpark: false,
           isDeleted: false,
@@ -477,11 +483,8 @@ export function NoteInput() {
   const handleFiles = async (files: FileList) => {
     const fileList = Array.from(files)
     const validFiles = fileList.filter(isAllowedFile)
-    const invalidCount = fileList.length - validFiles.length
 
-    if (invalidCount > 0) {
-      toast.error('仅支持图片、Word（doc/docx）和 Markdown 文件')
-    }
+    // 不支持的类型静默忽略
     if (validFiles.length === 0) return
 
     setIsExtracting(true)
@@ -501,9 +504,8 @@ export function NoteInput() {
       )
 
       setPendingFiles((prev) => [...prev, ...processed])
-      toast.success(`已添加 ${processed.length} 个文件`)
     } catch {
-      toast.error('文件解析失败，请重试')
+      // 解析失败静默
     } finally {
       setIsExtracting(false)
     }
@@ -710,7 +712,7 @@ export function NoteInput() {
                     .filter((tag) =>
                       tag.toLowerCase().includes(tagInput.trim().toLowerCase())
                     )
-                    .filter((tag) => !selectedTags.includes(tag))
+                    .filter((tag) => !effectiveTags.includes(tag))
                     .map((tag) => (
                       <button
                         key={tag}
