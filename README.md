@@ -1,37 +1,62 @@
-# 个人知识库
+# 🧠 个人知识库 (Personal Knowledge Base)
 
-基于 Next.js 的本地优先笔记与标签管理，支持 URL / 文本 AI 摘要（百度千帆）。
+https://buluhu-3fwsrbt34-sssyyd111111s-projects.vercel.app
 
-## 本地运行
+**基于 Next.js 的本地优先笔记与标签管理系统，内置 Impeccable 设计规范。**
+
+[](https://nextjs.org/)
+[](https://github.com/pbakaus/impeccable)
+[](https://cloud.baidu.com/product/wenxinworkshop)
+
+## ✨ 项目亮点
+
+  * **⚡ 极速启动**：自动计算笔记预计阅读时间，优先推荐短内容，从微小的胜利中获得动力。
+  * **🎨 Impeccable 审美**：接入业界领先的 AI 驱动设计规范，拥有极简、呼吸感十足的视觉体验。
+  * **🤖 智能摘要**：输入网址或上传文档，AI 自动提取核心观点，告别“只藏不读”。
+  * **🌟 灵感唤醒**：标记为“灵感”的内容会定期回访，通过跨越时空的对话激发新的火花。
+  * **📱 多端同步**：支持微信服务号一键转发，随时随地捕捉碎片化思绪。
+
+## 🚀 快速开始
+
+### 1\. 克隆与安装
 
 ```bash
+git clone <your-repo-url>
+cd personal-knowledge-base
 npm install
-cp .env.example .env.local
-# 编辑 .env.local，填入百度 API Key 与 Secret Key
+```
+
+### 2\. 配置环境变量
+
+将 `.env.example` 复制为 `.env.local`，并填入你的 API 密钥：
+
+```bash
+# 百度千帆 API 配置
+BAIDU_API_KEY=your_api_key
+BAIDU_SECRET_KEY=your_secret_key
+```
+
+### 3\. 本地开发
+
+```bash
 npm run dev
 ```
 
-浏览器访问 <http://localhost:3000>。
+访问 [http://localhost:3000](https://www.google.com/search?q=http://localhost:3000) 查看效果。
 
-## 默认笔记与作者简介 PDF
+## 📖 新手引导
 
-- 首次加载的示例笔记由 `lib/default-seed-notes.ts` 定义；其中「从微信创建的笔记」长文由 `public/seeds/wechat-body-part*.raw` 拼接，运行 `npm run seed:wechat` 可重新生成 `lib/seed-wechat-generated.ts`。
-- 「作者简介」附件路径：`public/author-profile-xierunqian.pdf`（由桌面 PDF 复制而来；若需更新，可替换该文件后保持文件名或同步修改 `default-seed-notes.ts` 中的 `sourceUrl`）。
+首次进入页面将自动触发 **Interactive Onboarding**：
 
-## 开始页与新手引导
+1.  **智能捕捉**：尝试在输入框粘贴一个网址。
+2.  **启动力**：观察列表顶部的阅读时长标注。
+3.  **内化**：点击笔记卡片，尝试标记“灵感”或“已消化”。
+4.  **联动**：扫描页面下方的二维码绑定微信。
 
-- **开始页**：首次进入点「即刻开始 / 跳过」后，会写入 `localStorage` 键 `buluohui-welcome-dismissed`，之后同一浏览器不再显示。若要再次体验，在开发者工具控制台执行：  
-  `localStorage.removeItem('buluohui-welcome-dismissed')` 后刷新。
-- **新手引导**：完成后写入 `buluohui-onboarding-completed`。清除：  
-  `localStorage.removeItem('buluohui-onboarding-completed')` 后刷新（需已看过开始页或已清除上一项）。
+## 🛠️ 技术栈
 
-## 环境变量
-
-见 `.env.example`。密钥仅放在 `.env.local`（已被 `.gitignore` 忽略）。
-
-## 构建
-
-```bash
-npm run build
-npm start
-```
+  * **框架**: Next.js 14 (App Router)
+  * **样式**: Tailwind CSS + Impeccable Design System
+  * **动画**: Framer Motion
+  * **AI**: 百度千帆大模型 / Claude 3.5 (via Cursor)
+  * **部署**: Vercel
