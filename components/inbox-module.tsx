@@ -2,7 +2,13 @@
 
 import { Flame, ChevronRight } from 'lucide-react'
 import { NoteCard } from '@/components/note-card'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { useOnboardingTour } from '@/components/onboarding-tour-provider'
+import {
+  homeDashboardListScrollAreaClass,
+  homeDashboardSingleColumnGridClass,
+} from '@/lib/home-list-styles'
+import { openNoteOrFile } from '@/lib/open-note-or-file'
 import { useNoteStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
@@ -12,7 +18,7 @@ interface InboxModuleProps {
 }
 
 const headerShell =
-  'sticky top-0 z-10 mb-2 w-full rounded-2xl border border-border/70 bg-card/95 p-4 text-left shadow-[var(--shadow-card)] backdrop-blur-sm transition-all hover:border-border hover:shadow-md'
+  'mb-2 w-full shrink-0 rounded-2xl border border-border/70 bg-card/95 p-4 text-left shadow-[var(--shadow-card)] backdrop-blur-sm transition-all hover:border-border hover:shadow-md'
 
 export function InboxModule({ onNoteClick, onHeaderClick }: InboxModuleProps) {
   const onboarding = useOnboardingTour()
@@ -25,8 +31,8 @@ export function InboxModule({ onNoteClick, onHeaderClick }: InboxModuleProps) {
   ).length
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <button type="button" onClick={onHeaderClick} className={cn(headerShell, 'shrink-0')}>
+    <div className="flex min-h-0 flex-1 flex-col max-lg:flex-none">
+      <button type="button" onClick={onHeaderClick} className={headerShell}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-4">
             <div
@@ -54,35 +60,35 @@ export function InboxModule({ onNoteClick, onHeaderClick }: InboxModuleProps) {
         </div>
       </button>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] pr-0.5">
-        <div className="flex flex-col gap-2 pb-1">
+      <ScrollArea className={homeDashboardListScrollAreaClass}>
         {displayNotes.length > 0 ? (
-          displayNotes.slice(0, 5).map((note) => {
-            const isTourCard =
-              onboarding?.isActive &&
-              onboarding.step === 2 &&
-              onboarding.tourNoteId === note.id
-            return (
-              <NoteCard
-                key={note.id}
-                note={note}
-                compact
-                inboxHomeFixed
-                dataTour={isTourCard ? 'onboarding-inbox-note' : undefined}
-                tourEmphasizeTime={Boolean(isTourCard)}
-                onClick={() => onNoteClick(note.id)}
-              />
-            )
-          })
+          <div className={cn(homeDashboardSingleColumnGridClass, 'items-start')}>
+            {displayNotes.map((note) => {
+              const isTourCard =
+                onboarding?.isActive &&
+                onboarding.step === 2 &&
+                onboarding.tourNoteId === note.id
+              return (
+                <div key={note.id} className="min-w-0">
+                  <NoteCard
+                    note={note}
+                    listFixedHeight
+                    dataTour={isTourCard ? 'onboarding-inbox-note' : undefined}
+                    tourEmphasizeTime={Boolean(isTourCard)}
+                    onClick={() => openNoteOrFile(note, onNoteClick)}
+                  />
+                </div>
+              )
+            })}
+          </div>
         ) : (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/25 py-8 text-center">
-            <Flame className="mb-2 h-7 w-7 text-muted-foreground/40" />
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/25 py-16 text-center">
+            <Flame className="mb-4 h-12 w-12 text-muted-foreground/30" />
             <p className="text-sm text-muted-foreground">暂无待启动的笔记</p>
             <p className="mt-1 text-xs text-muted-foreground/70">在下方输入框添加新内容</p>
           </div>
         )}
-        </div>
-      </div>
+      </ScrollArea>
     </div>
   )
 }

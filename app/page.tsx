@@ -55,13 +55,13 @@ function HomeMain() {
             ) : currentView === 'home' ? (
               <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col">
                 <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] lg:grid lg:grid-cols-2 lg:gap-8 lg:overflow-hidden">
-                  <div className="flex min-h-0 flex-col lg:h-full lg:min-h-0 lg:overflow-hidden lg:pr-1 lg:[scrollbar-gutter:stable]">
+                  <div className="flex min-h-0 flex-col lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pr-1 lg:[scrollbar-gutter:stable]">
                     <InboxModule
                       onNoteClick={handleNoteClick}
                       onHeaderClick={() => setCurrentView('inbox')}
                     />
                   </div>
-                  <div className="flex min-h-0 flex-col gap-5 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1 lg:[scrollbar-gutter:stable] [&>*]:shrink-0">
+                  <div className="flex min-h-0 flex-col gap-5 lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pr-1 lg:[scrollbar-gutter:stable]">
                     <ProcessingModule
                       onNoteClick={handleNoteClick}
                       onHeaderClick={() => setCurrentView('processing')}

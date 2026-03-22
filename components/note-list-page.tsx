@@ -21,6 +21,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { NoteCard } from '@/components/note-card'
+import {
+  homeStatusListGridClass,
+  homeStatusListScrollAreaClass,
+} from '@/lib/home-list-styles'
+import { openNoteOrFile } from '@/lib/open-note-or-file'
 import { useNoteStore } from '@/lib/store'
 import { SortOption, ViewType } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -204,11 +209,11 @@ export function NoteListPage({ onNoteClick }: NoteListPageProps) {
       </div>
 
       {/* 笔记列表：可纵向滚动；待启动/处理中/灵感为固定高度卡片 + 双列宽度一致 */}
-      <ScrollArea className="h-0 min-h-0 flex-1 overflow-hidden pr-1">
+      <ScrollArea className={homeStatusListScrollAreaClass}>
         {notes.length > 0 ? (
           <div
             className={cn(
-              'grid grid-cols-1 gap-5 pb-8 md:grid-cols-2 md:gap-6',
+              homeStatusListGridClass,
               isStatusListView && 'items-start'
             )}
           >
@@ -217,13 +222,7 @@ export function NoteListPage({ onNoteClick }: NoteListPageProps) {
                 <NoteCard
                   note={note}
                   listFixedHeight={isStatusListView}
-                  onClick={() => {
-                    if (note.type === 'file' && note.sourceUrl) {
-                      window.open(note.sourceUrl, '_blank')
-                      return
-                    }
-                    onNoteClick(note.id)
-                  }}
+                  onClick={() => openNoteOrFile(note, onNoteClick)}
                 />
                 {/* 回收站特殊操作 */}
                 {currentView === 'trash' && (

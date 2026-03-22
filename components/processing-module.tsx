@@ -2,6 +2,12 @@
 
 import { FolderOpen, ChevronRight } from 'lucide-react'
 import { NoteCard } from '@/components/note-card'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  homeDashboardListScrollAreaClass,
+  homeDashboardSingleColumnGridClass,
+} from '@/lib/home-list-styles'
+import { openNoteOrFile } from '@/lib/open-note-or-file'
 import { useNoteStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
@@ -11,7 +17,7 @@ interface ProcessingModuleProps {
 }
 
 const headerShell =
-  'sticky top-0 z-10 mb-2 w-full rounded-2xl border border-border/70 bg-card/95 p-4 text-left shadow-[var(--shadow-card)] backdrop-blur-sm transition-all hover:border-border hover:shadow-md'
+  'mb-2 w-full shrink-0 rounded-2xl border border-border/70 bg-card/95 p-4 text-left shadow-[var(--shadow-card)] backdrop-blur-sm transition-all hover:border-border hover:shadow-md'
 
 export function ProcessingModule({ onNoteClick, onHeaderClick }: ProcessingModuleProps) {
   const getProcessingNotes = useNoteStore((state) => state.getProcessingNotes)
@@ -19,7 +25,7 @@ export function ProcessingModule({ onNoteClick, onHeaderClick }: ProcessingModul
   const totalCount = displayNotes.length
 
   return (
-    <div className="flex min-h-0 shrink-0 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col max-lg:flex-none">
       <button type="button" onClick={onHeaderClick} className={headerShell}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-4">
@@ -45,24 +51,27 @@ export function ProcessingModule({ onNoteClick, onHeaderClick }: ProcessingModul
         </div>
       </button>
 
-      <div className="flex flex-col gap-2">
+      <ScrollArea className={homeDashboardListScrollAreaClass}>
         {displayNotes.length > 0 ? (
-          displayNotes.slice(0, 3).map((note) => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              compact
-              onClick={() => onNoteClick(note.id)}
-            />
-          ))
+          <div className={cn(homeDashboardSingleColumnGridClass, 'items-start')}>
+            {displayNotes.map((note) => (
+              <div key={note.id} className="min-w-0">
+                <NoteCard
+                  note={note}
+                  listFixedHeight
+                  onClick={() => openNoteOrFile(note, onNoteClick)}
+                />
+              </div>
+            ))}
+          </div>
         ) : (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/25 py-6 text-center">
-            <FolderOpen className="mb-2 h-7 w-7 text-muted-foreground/40" />
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/25 py-16 text-center">
+            <FolderOpen className="mb-4 h-12 w-12 text-muted-foreground/30" />
             <p className="text-sm text-muted-foreground">暂无处理中的笔记</p>
             <p className="mt-1 text-xs text-muted-foreground/70">点击待启动的笔记开始阅读</p>
           </div>
         )}
-      </div>
+      </ScrollArea>
     </div>
   )
 }

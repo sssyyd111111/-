@@ -13,6 +13,11 @@ npm run dev
 
 浏览器访问 <http://localhost:3000>。
 
+## 默认笔记与作者简介 PDF
+
+- 首次加载的示例笔记由 `lib/default-seed-notes.ts` 定义；其中「从微信创建的笔记」长文由 `public/seeds/wechat-body-part*.raw` 拼接，运行 `npm run seed:wechat` 可重新生成 `lib/seed-wechat-generated.ts`。
+- 「作者简介」附件路径：`public/author-profile-xierunqian.pdf`（由桌面 PDF 复制而来；若需更新，可替换该文件后保持文件名或同步修改 `default-seed-notes.ts` 中的 `sourceUrl`）。
+
 ## 开始页与新手引导
 
 - **开始页**：首次进入点「即刻开始 / 跳过」后，会写入 `localStorage` 键 `buluohui-welcome-dismissed`，之后同一浏览器不再显示。若要再次体验，在开发者工具控制台执行：  

@@ -10,151 +10,7 @@ import {
   SortOption,
   estimatedTimeToMinutes 
 } from './types'
-
-// 生成示例数据
-function generateSampleNotes(): Note[] {
-  const now = Date.now()
-  const day = 24 * 60 * 60 * 1000
-
-  return [
-    {
-      id: '1',
-      type: 'url',
-      title: '如何构建高效的个人知识管理系统',
-      content: '本文介绍了构建个人知识管理系统的关键要素，包括信息收集、整理、回顾和应用四个核心环节...',
-      userNotes: '',
-      sourceUrl: 'https://example.com/knowledge-management',
-      tags: ['产品/效率'],
-      status: 'inbox',
-      isSpark: false,
-      isDeleted: false,
-      estimatedTime: '<7min',
-      remindAt: null,
-      createdAt: now - 1 * day,
-      lastViewedAt: null,
-      tagLoading: false,
-    },
-    {
-      id: '2',
-      type: 'url',
-      title: 'AI 在产品设计中的应用趋势',
-      content: '探讨 AI 技术如何改变产品设计流程，从用户研究到原型设计的各个环节...',
-      userNotes: '',
-      sourceUrl: 'https://example.com/ai-product-design',
-      tags: ['产品/AI'],
-      status: 'inbox',
-      isSpark: false,
-      isDeleted: false,
-      estimatedTime: '<10min',
-      remindAt: null,
-      createdAt: now - 2 * day,
-      lastViewedAt: null,
-      tagLoading: false,
-    },
-    {
-      id: '3',
-      type: 'url',
-      title: '极简主义设计原则',
-      content: '介绍极简主义设计的核心原则和实践方法，帮助设计师创造简洁优雅的用户界面...',
-      userNotes: '',
-      sourceUrl: 'https://example.com/minimalism-design',
-      tags: ['设计'],
-      status: 'inbox',
-      isSpark: false,
-      isDeleted: false,
-      estimatedTime: '<3min',
-      remindAt: null,
-      createdAt: now - 5 * day,
-      lastViewedAt: null,
-      tagLoading: false,
-    },
-    {
-      id: '4',
-      type: 'spark',
-      title: `${new Date(now - 3 * day).getFullYear()}-${new Date(now - 3 * day).getMonth() + 1}-${new Date(now - 3 * day).getDate()}日的灵感`,
-      content: '',
-      userNotes: '产品设计的本质是解决用户问题，而不是堆砌功能。简单才是最难的。',
-      sourceUrl: '',
-      tags: ['产品'],
-      status: 'done',
-      isSpark: true,
-      isDeleted: false,
-      estimatedTime: '<3min',
-      remindAt: null,
-      createdAt: now - 3 * day,
-      lastViewedAt: now - 2 * day,
-      tagLoading: false,
-    },
-    {
-      id: '5',
-      type: 'url',
-      title: '数据驱动的产品决策',
-      content: '如何利用数据分析来指导产品决策，从指标定义到A/B测试的完整流程...',
-      userNotes: '这篇文章对数据分析有很好的指导意义',
-      sourceUrl: 'https://example.com/data-driven',
-      tags: ['产品/数据'],
-      status: 'processing',
-      isSpark: false,
-      isDeleted: false,
-      estimatedTime: '<20min',
-      remindAt: null,
-      createdAt: now - 4 * day,
-      lastViewedAt: now - 1 * day,
-      tagLoading: false,
-    },
-    {
-      id: '6',
-      type: 'url',
-      title: '用户体验设计的未来',
-      content: '探讨用户体验设计领域的发展趋势和新兴技术的影响...',
-      userNotes: '',
-      sourceUrl: 'https://example.com/ux-future',
-      tags: ['设计', '产品'],
-      status: 'processing',
-      isSpark: true,
-      isDeleted: false,
-      estimatedTime: '<10min',
-      remindAt: null,
-      createdAt: now - 6 * day,
-      lastViewedAt: now - 3 * day,
-      tagLoading: false,
-    },
-    {
-      id: '7',
-      type: 'file',
-      title: '产品路线图模板.pdf',
-      content: '一份完整的产品路线图模板，包含季度目标、里程碑和资源分配...',
-      userNotes: '',
-      sourceUrl: '',
-      tags: ['产品'],
-      status: 'inbox',
-      isSpark: false,
-      isDeleted: false,
-      estimatedTime: '<7min',
-      remindAt: null,
-      createdAt: now - 0.5 * day,
-      lastViewedAt: null,
-      tagLoading: false,
-    },
-    {
-      id: '8',
-      type: 'spark',
-      title: `${new Date(now).getFullYear()}-${new Date(now).getMonth() + 1}-${new Date(now).getDate()}日的灵感`,
-      content: '',
-      userNotes: '好的产品经理需要具备同理心，能够站在用户的角度思考问题。',
-      sourceUrl: '',
-      tags: ['产品'],
-      status: 'done',
-      isSpark: true,
-      isDeleted: false,
-      estimatedTime: '<3min',
-      remindAt: null,
-      createdAt: now,
-      lastViewedAt: now,
-      tagLoading: false,
-    },
-  ]
-}
+import { createDefaultSeedNotes } from './default-seed-notes'
 
 interface NoteStore {
   // 状态
@@ -203,7 +59,7 @@ export const useNoteStore = create<NoteStore>()(
   persist(
     (set, get) => ({
       // 初始状态
-      notes: generateSampleNotes(),
+      notes: createDefaultSeedNotes(),
       currentView: 'home',
       selectedTag: null,
       sidebarOpen: true,
@@ -256,11 +112,24 @@ export const useNoteStore = create<NoteStore>()(
         }))
       },
       
+      /**
+       * 标记/取消「灵感」。
+       * 灵感时刻列表要求 isSpark && status==='done'，因此开启灵感时同步设为已归档（done）；
+       * 关闭灵感时若当前为 done，则回到「处理中」以便继续消化。
+       */
       markAsSpark: (id, value) => {
         set((state) => ({
-          notes: state.notes.map((note) =>
-            note.id === id ? { ...note, isSpark: value } : note
-          ),
+          notes: state.notes.map((note) => {
+            if (note.id !== id) return note
+            if (value) {
+              return { ...note, isSpark: true, status: 'done' as NoteStatus }
+            }
+            return {
+              ...note,
+              isSpark: false,
+              status: note.status === 'done' ? ('processing' as NoteStatus) : note.status,
+            }
+          }),
         }))
       },
       

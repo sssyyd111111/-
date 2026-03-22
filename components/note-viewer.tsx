@@ -21,6 +21,8 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { UserNotesMarkdownPreview } from '@/components/user-notes-markdown'
 import {
   Popover,
   PopoverContent,
@@ -278,7 +280,8 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
   const handleToggleSpark = () => {
     const next = !currentNote.isSpark
     markAsSpark(currentNote.id, next)
-    moveToProcessingIfInbox()
+    // 勿调用 moveToProcessingIfInbox：从待启动点「灵感」时，store 会将 status 设为 done；
+    // 若此处再按 inbox→processing 覆盖，则永远无法进入「灵感时刻」（该栏要求 done + isSpark）。
     if (
       onboarding?.isActive &&
       onboarding.step === 3 &&
@@ -651,16 +654,36 @@ export function NoteViewer({ noteId, onClose }: NoteViewerProps) {
             )}
 
             <div className="mb-2">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                我的笔记
-              </h3>
-              <Textarea
-                value={userNotes}
-                onChange={(e) => handleNotesChange(e.target.value)}
-                onBlur={handleSaveNotes}
-                placeholder="开始写下你的灵感吧..."
-                className="min-h-[160px] resize-none rounded-2xl border-border/60 text-[15px] leading-relaxed md:text-base"
-              />
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  我的笔记
+                </h3>
+                <p className="text-[11px] leading-snug text-muted-foreground/85">
+                  支持 Markdown（**粗体**、列表、`代码`、链接、表格等）
+                </p>
+              </div>
+              <Tabs defaultValue="edit" className="w-full">
+                <TabsList className="mb-2 h-9 w-full max-w-[220px]">
+                  <TabsTrigger value="edit" className="flex-1">
+                    编辑
+                  </TabsTrigger>
+                  <TabsTrigger value="preview" className="flex-1">
+                    预览
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="edit" className="mt-0 outline-none">
+                  <Textarea
+                    value={userNotes}
+                    onChange={(e) => handleNotesChange(e.target.value)}
+                    onBlur={handleSaveNotes}
+                    placeholder="开始写下你的灵感吧…（支持 Markdown）"
+                    className="min-h-[200px] resize-y rounded-2xl border-border/60 font-mono text-[14px] leading-relaxed md:min-h-[220px] md:text-[15px]"
+                  />
+                </TabsContent>
+                <TabsContent value="preview" className="mt-0 outline-none">
+                  <UserNotesMarkdownPreview source={userNotes} />
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
 
