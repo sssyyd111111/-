@@ -31,7 +31,7 @@ interface NoteListPageProps {
 
 // 视图配置
 const viewConfig: Record<
-  Exclude<ViewType, 'home'>,
+  Exclude<ViewType, 'home' | 'wechatUpload'>,
   {
     icon: typeof Inbox
     title: string
@@ -44,29 +44,29 @@ const viewConfig: Record<
     icon: Inbox,
     title: '待启动',
     description: '等待你去探索的知识宝藏',
-    iconBg: 'bg-blue-50',
-    iconColor: 'text-blue-600',
+    iconBg: 'bg-primary/12 shadow-[0_4px_16px_-6px_var(--mint-glow)]',
+    iconColor: 'text-primary',
   },
   processing: {
     icon: Clock,
     title: '处理中',
     description: '正在消化吸收的内容',
-    iconBg: 'bg-orange-50',
-    iconColor: 'text-orange-600',
+    iconBg: 'bg-primary/10 ring-1 ring-primary/15',
+    iconColor: 'text-primary',
   },
   spark: {
     icon: Lightbulb,
     title: '灵感时刻',
     description: '收藏的精华，随时回顾',
-    iconBg: 'bg-yellow-50',
-    iconColor: 'text-yellow-600',
+    iconBg: 'bg-primary/12 ring-1 ring-primary/12 dark:bg-primary/15',
+    iconColor: 'text-primary',
   },
   tag: {
     icon: Tag,
     title: '标签筛选',
     description: '按标签分类的知识',
-    iconBg: 'bg-green-50',
-    iconColor: 'text-green-600',
+    iconBg: 'bg-primary/14 ring-1 ring-primary/15',
+    iconColor: 'text-primary',
   },
   trash: {
     icon: Trash2,
@@ -101,7 +101,7 @@ export function NoteListPage({ onNoteClick }: NoteListPageProps) {
   const [localSearch, setLocalSearch] = useState(searchQuery)
   const notes = getFilteredNotes()
 
-  if (currentView === 'home') {
+  if (currentView === 'home' || currentView === 'wechatUpload') {
     return null
   }
 
@@ -114,6 +114,12 @@ export function NoteListPage({ onNoteClick }: NoteListPageProps) {
 
   const Icon = config.icon
 
+  /** 全部状态下的三个列表：同一套栅格 + 固定高度卡片 */
+  const isStatusListView =
+    currentView === 'inbox' ||
+    currentView === 'processing' ||
+    currentView === 'spark'
+
   const handleSearch = () => {
     setSearchQuery(localSearch)
   }
@@ -125,30 +131,30 @@ export function NoteListPage({ onNoteClick }: NoteListPageProps) {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* 顶部信息卡片 */}
-      <div className="mb-4 rounded-xl border bg-card p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <div className="mb-8 rounded-2xl border border-border/60 bg-card/90 p-6 shadow-[var(--shadow-card)] backdrop-blur-sm">
+        <div className="flex flex-wrap items-center justify-between gap-6">
+          <div className="flex items-center gap-5">
             <div
               className={cn(
-                'flex h-12 w-12 items-center justify-center rounded-xl',
+                'flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl',
                 config.iconBg
               )}
             >
-              <Icon className={cn('h-6 w-6', config.iconColor)} />
+              <Icon className={cn('h-7 w-7', config.iconColor)} />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-foreground">
+              <h1 className="text-xl font-semibold tracking-tight text-foreground">
                 {config.title}
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {config.description}
               </p>
             </div>
           </div>
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-            <span className="text-xl font-bold text-foreground">
+          <div className="flex h-14 min-w-14 items-center justify-center rounded-2xl bg-muted/80 px-4 ring-1 ring-border/50">
+            <span className="text-2xl font-semibold tabular-nums text-foreground">
               {notes.length}
             </span>
           </div>
@@ -156,14 +162,14 @@ export function NoteListPage({ onNoteClick }: NoteListPageProps) {
       </div>
 
       {/* 搜索和排序栏 */}
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-6 flex items-center gap-3">
         <div className="relative flex-1">
           <Input
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="根据标题、摘要、笔记等搜索条目..."
-            className="pr-10"
+            className="h-11 rounded-xl border-border/60 pr-10"
           />
           <Button
             variant="ghost"
@@ -197,14 +203,20 @@ export function NoteListPage({ onNoteClick }: NoteListPageProps) {
         </DropdownMenu>
       </div>
 
-      {/* 笔记列表 */}
-      <ScrollArea className="flex-1">
+      {/* 笔记列表：可纵向滚动；待启动/处理中/灵感为固定高度卡片 + 双列宽度一致 */}
+      <ScrollArea className="h-0 min-h-0 flex-1 overflow-hidden pr-1">
         {notes.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3 pb-4">
+          <div
+            className={cn(
+              'grid grid-cols-1 gap-5 pb-8 md:grid-cols-2 md:gap-6',
+              isStatusListView && 'items-start'
+            )}
+          >
             {notes.map((note) => (
-              <div key={note.id} className="relative">
+              <div key={note.id} className="group relative min-w-0">
                 <NoteCard
                   note={note}
+                  listFixedHeight={isStatusListView}
                   onClick={() => {
                     if (note.type === 'file' && note.sourceUrl) {
                       window.open(note.sourceUrl, '_blank')

@@ -11,6 +11,7 @@ export type ViewType =
   | 'processing' 
   | 'spark' 
   | 'tag' 
+  | 'wechatUpload'
   | 'trash'
 
 // 笔记接口定义
@@ -72,6 +73,20 @@ export function estimatedTimeToMinutes(time: string): number {
     case '>20min': return 30
     default: return 0
   }
+}
+
+/** 预估阅读是否「快读」（&lt;3min 档位或解析为不足 3 分钟）— 用于醒目配色 */
+export function isQuickReadEstimate(estimatedTime: string): boolean {
+  const t = estimatedTime.trim()
+  if (!t) return false
+  if (t === '<3min') return true
+  const video = t.match(/^video\s+(\d+)/i)
+  if (video) return parseInt(video[1], 10) < 3
+  const angle = t.match(/^<\s*(\d+)\s*min$/i)
+  if (angle) return parseInt(angle[1], 10) < 3
+  const plain = t.match(/^(\d+)\s*min$/i)
+  if (plain) return parseInt(plain[1], 10) < 3
+  return false
 }
 
 // 格式化日期

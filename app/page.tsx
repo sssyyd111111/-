@@ -1,6 +1,9 @@
 'use client'
 
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
+import { WelcomeScreen } from '@/components/welcome-screen'
+import { OnboardingTourProvider, useOnboardingTour } from '@/components/onboarding-tour-provider'
+import { useWelcomeGate } from '@/hooks/use-welcome-gate'
 import { AppSidebar } from '@/components/app-sidebar'
 import { InboxModule } from '@/components/inbox-module'
 import { ProcessingModule } from '@/components/processing-module'
@@ -8,10 +11,15 @@ import { SparkModule } from '@/components/spark-module'
 import { NoteInput } from '@/components/note-input'
 import { NoteViewer } from '@/components/note-viewer'
 import { NoteListPage } from '@/components/note-list-page'
+import { WechatUploadPage } from '@/components/wechat-upload-page'
 import { useNoteStore } from '@/lib/store'
 import { Toaster } from 'sonner'
 
-export default function HomePage() {
+/**
+ * 主应用壳：必须在 OnboardingTourProvider 内，才能使用 useOnboardingTour。
+ */
+function HomeMain() {
+  const onboarding = useOnboardingTour()
   const {
     currentView,
     viewerOpen,
@@ -22,6 +30,7 @@ export default function HomePage() {
   } = useNoteStore()
 
   const handleNoteClick = (noteId: string) => {
+    onboarding?.tryAdvanceOnNoteOpen(noteId)
     openViewer(noteId)
   }
 
@@ -30,35 +39,34 @@ export default function HomePage() {
       <AppSidebar />
       <SidebarInset>
         <div className="relative flex h-screen flex-col">
-          {/* 顶部栏：侧边栏触发器 */}
-          <header className="flex h-12 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="h-8 w-8" />
-            <span className="text-sm font-medium text-muted-foreground">
-              {currentView === 'home' ? '首页' : ''}
+          <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border/60 bg-card/40 px-6 backdrop-blur-sm">
+            <SidebarTrigger className="h-9 w-9 rounded-xl" />
+            <span className="text-sm font-medium tracking-tight text-muted-foreground">
+              {currentView === 'home' && '首页'}
+              {currentView === 'wechatUpload' && '微信上传'}
             </span>
           </header>
 
-          {/* 主内容区 */}
-          <main className="flex-1 overflow-hidden p-6">
-            {currentView === 'home' ? (
-              // 首页视图
-              <div className="mx-auto h-full max-w-4xl">
-                <div className="grid h-full grid-cols-2 gap-6">
-                  {/* 左列：待启动 */}
-                  <div className="flex flex-col overflow-hidden">
-                    <InboxModule 
-                      onNoteClick={handleNoteClick} 
+          <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-4 lg:px-8 lg:py-5">
+            {currentView === 'wechatUpload' ? (
+              <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col">
+                <WechatUploadPage />
+              </div>
+            ) : currentView === 'home' ? (
+              <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col">
+                <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] lg:grid lg:grid-cols-2 lg:gap-8 lg:overflow-hidden">
+                  <div className="flex min-h-0 flex-col lg:h-full lg:min-h-0 lg:overflow-hidden lg:pr-1 lg:[scrollbar-gutter:stable]">
+                    <InboxModule
+                      onNoteClick={handleNoteClick}
                       onHeaderClick={() => setCurrentView('inbox')}
                     />
                   </div>
-
-                  {/* 右列：处理中 + 灵感时刻 */}
-                  <div className="flex flex-col gap-6 overflow-auto">
-                    <ProcessingModule 
+                  <div className="flex min-h-0 flex-col gap-5 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1 lg:[scrollbar-gutter:stable] [&>*]:shrink-0">
+                    <ProcessingModule
                       onNoteClick={handleNoteClick}
                       onHeaderClick={() => setCurrentView('processing')}
                     />
-                    <SparkModule 
+                    <SparkModule
                       onNoteClick={handleNoteClick}
                       onHeaderClick={() => setCurrentView('spark')}
                     />
@@ -66,21 +74,20 @@ export default function HomePage() {
                 </div>
               </div>
             ) : (
-              // 列表视图
-              <div className="mx-auto h-full max-w-4xl">
+              <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col">
                 <NoteListPage onNoteClick={handleNoteClick} />
               </div>
             )}
           </main>
 
-          {/* 底部输入框 */}
-          <div className="border-t bg-background p-4">
-            <div className="mx-auto max-w-2xl">
-              <NoteInput />
+          {currentView !== 'wechatUpload' && (
+            <div className="border-t border-border/60 bg-background/80 px-6 py-6 backdrop-blur-md lg:px-10">
+              <div className="mx-auto max-w-2xl">
+                <NoteInput />
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Toast 位置由 globals.css 中 [data-sonner-toaster] 相对本栏定位 */}
           <Toaster
             position="top-center"
             duration={1500}
@@ -98,10 +105,27 @@ export default function HomePage() {
         </div>
       </SidebarInset>
 
-      {/* 笔记详情弹窗 */}
       {viewerOpen && currentNoteId && (
         <NoteViewer noteId={currentNoteId} onClose={closeViewer} />
       )}
     </SidebarProvider>
+  )
+}
+
+export default function HomePage() {
+  const { state: welcomeState, dismiss: dismissWelcome } = useWelcomeGate()
+
+  if (welcomeState === 'loading') {
+    return <div className="min-h-svh bg-background" aria-hidden />
+  }
+
+  if (welcomeState === 'show') {
+    return <WelcomeScreen onDismiss={dismissWelcome} />
+  }
+
+  return (
+    <OnboardingTourProvider>
+      <HomeMain />
+    </OnboardingTourProvider>
   )
 }

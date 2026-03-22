@@ -444,6 +444,8 @@ export const useNoteStore = create<NoteStore>()(
         switch (currentView) {
           case 'home':
             return []
+          case 'wechatUpload':
+            return []
           case 'inbox':
             filtered = notes.filter(
               (n) => ['inbox', 'loading', 'active'].includes(n.status) && !n.isDeleted

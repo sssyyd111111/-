@@ -30,8 +30,14 @@ import * as mammoth from 'mammoth'
 import { createWorker } from 'tesseract.js'
 import { toast } from 'sonner'
 import { useNoteStore } from '@/lib/store'
+import {
+  ONBOARDING_DEMO_SUMMARY,
+  ONBOARDING_DEMO_URL,
+  isOnboardingDemoUrl,
+} from '@/lib/onboarding-tour'
 import { NoteType } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { useOnboardingTour } from '@/components/onboarding-tour-provider'
 
 // URL 正则表达式
 const URL_REGEX = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,})([/?#].*)?$/i
@@ -147,6 +153,8 @@ export function NoteInput() {
   const [urlTitle, setUrlTitle] = useState('')
   const [isExtracting, setIsExtracting] = useState(false)
   const [isRecognizingWeb, setIsRecognizingWeb] = useState(false)
+  const [inputAreaHovered, setInputAreaHovered] = useState(false)
+  const [textareaFocused, setTextareaFocused] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dropZoneRef = useRef<HTMLDivElement>(null)
@@ -154,6 +162,8 @@ export function NoteInput() {
 
   const addNote = useNoteStore((state) => state.addNote)
   const updateNote = useNoteStore((state) => state.updateNote)
+  const onboarding = useOnboardingTour()
+  const onboardingPrefilledRef = useRef(false)
 
   /** URL 与纯文本均走 /api/summarize，由后端区分 url 抓取或直接 text */
   const runAiSummary = (
@@ -295,6 +305,17 @@ export function NoteInput() {
     }
   }, [])
 
+  /** 新手引导第一步：预填示例链接 */
+  useEffect(() => {
+    if (!onboarding?.isActive || onboarding.step !== 1) {
+      onboardingPrefilledRef.current = false
+      return
+    }
+    if (onboardingPrefilledRef.current) return
+    setInput(ONBOARDING_DEMO_URL)
+    onboardingPrefilledRef.current = true
+  }, [onboarding?.isActive, onboarding?.step])
+
   // 提交笔记
   const handleSubmit = async () => {
     const hasText = Boolean(input.trim())
@@ -311,29 +332,49 @@ export function NoteInput() {
           : `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}日的灵感`
 
       if (type === 'url') {
+        const demoOnboarding =
+          onboarding?.isActive &&
+          onboarding.step === 1 &&
+          isOnboardingDemoUrl(normalizedInputUrl)
+
         const createdId = addNote({
           type: 'url',
-          title: title || '正在生成标题...',
-          content: '',
-          summary: '',
+          title: demoOnboarding ? '《单向度的人》' : title || '正在生成标题...',
+          content: demoOnboarding ? ONBOARDING_DEMO_SUMMARY : '',
+          summary: demoOnboarding ? ONBOARDING_DEMO_SUMMARY : '',
           keyPoints: [],
-          readTime: '',
+          readTime: demoOnboarding ? '<3min' : '',
           userNotes: '',
           sourceUrl: normalizedInputUrl,
           tags: effectiveTags,
-          status: 'loading',
+          status: demoOnboarding ? 'active' : 'loading',
           isSpark: false,
           isDeleted: false,
           estimatedTime: '<3min',
           remindAt: reminderTime,
         })
 
-        runAiSummary(
-          createdId,
-          title || normalizedInputUrl,
-          { url: normalizedInputUrl },
-          'AI 摘要失败，已保留原始链接'
-        )
+        if (demoOnboarding) {
+          updateNote(createdId, {
+            title: '《单向度的人》',
+            content: ONBOARDING_DEMO_SUMMARY,
+            summary: ONBOARDING_DEMO_SUMMARY,
+            readTime: '<3min',
+            status: 'active',
+            estimatedTime: '<3min',
+          })
+        } else {
+          runAiSummary(
+            createdId,
+            title || normalizedInputUrl,
+            { url: normalizedInputUrl },
+            'AI 摘要失败，已保留原始链接'
+          )
+        }
+
+        if (onboarding?.isActive && onboarding.step === 1) {
+          onboarding.beginStep2(createdId)
+        }
       } else {
         const rawText = input.trim()
         const createdId = addNote({
@@ -577,13 +618,31 @@ export function NoteInput() {
     setShowCustomCalendar(false)
   }
 
+  const hasTypedInput = input.trim().length > 0
+  const inputEngaged = textareaFocused || hasTypedInput
+
   return (
     <div
       ref={dropZoneRef}
+      data-tour="note-input"
       className={cn(
-        'relative rounded-2xl border bg-card p-3 shadow-lg transition-all duration-200',
-        isDragOver && 'border-primary ring-2 ring-primary/20'
+        'relative rounded-[1.25rem] border bg-card/90 p-4 shadow-[var(--shadow-float)] backdrop-blur-sm',
+        'transition-[transform,box-shadow,border-color,ring] duration-300 ease-out motion-reduce:transition-none',
+        onboarding?.isActive &&
+          onboarding.step === 1 &&
+          'z-[475] ring-2 ring-primary/65 ring-offset-2 ring-offset-background motion-safe:animate-pulse',
+        /* 默认 */
+        !isDragOver &&
+          !inputEngaged &&
+          'border-border/60 motion-safe:hover:-translate-y-0.5 hover:border-primary/35 motion-safe:hover:shadow-lg',
+        /* 鼠标悬停（未聚焦时加强一点） */
+        inputAreaHovered && !isDragOver && !textareaFocused && 'border-primary/25 shadow-md',
+        /* 聚焦或正在输入 */
+        inputEngaged && !isDragOver && 'border-primary/50 shadow-md ring-2 ring-primary/15',
+        isDragOver && 'border-primary ring-2 ring-primary/25'
       )}
+      onMouseEnter={() => setInputAreaHovered(true)}
+      onMouseLeave={() => setInputAreaHovered(false)}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -591,7 +650,7 @@ export function NoteInput() {
     >
       {/* 拖拽提示 */}
       {isDragOver && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-primary/5 backdrop-blur-sm">
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[1.25rem] bg-primary/8 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-2 text-primary">
             <FileText className="h-8 w-8" />
             <span className="text-sm font-medium">
@@ -629,14 +688,25 @@ export function NoteInput() {
         </div>
       )}
 
-      {/* 主输入区 */}
-      <div className="flex items-start gap-2">
+      {/* 主输入区：高度约为原 120px 的 2/3 */}
+      <div
+        className={cn(
+          'flex items-start gap-3 transition-transform duration-300 ease-out motion-reduce:transition-none',
+          inputAreaHovered && !isDragOver && 'motion-safe:-translate-y-px',
+          textareaFocused && 'motion-safe:scale-[1.01]'
+        )}
+      >
         {/* 输入类型图标 */}
-        <div className="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
+        <div
+          className={cn(
+            'mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/10 transition-all duration-300 motion-reduce:transition-none',
+            (inputAreaHovered || textareaFocused) && 'motion-safe:scale-105 ring-primary/25'
+          )}
+        >
           {currentType === 'url' ? (
-            <Link className="h-4 w-4 text-blue-500" />
+            <Link className="h-4 w-4 text-primary" />
           ) : (
-            <Lightbulb className="h-4 w-4 text-yellow-500" />
+            <Lightbulb className="h-4 w-4 text-amber-500" />
           )}
         </div>
 
@@ -645,22 +715,31 @@ export function NoteInput() {
           onChange={(e) => setInput(e.target.value)}
           onPaste={handlePaste}
           onKeyDown={handleInputKeyDown}
+          onFocus={() => setTextareaFocused(true)}
+          onBlur={() => setTextareaFocused(false)}
           placeholder="粘贴网址，记录灵感，拖拽添加文件..."
-          className="min-h-[112px] flex-1 resize-none bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground"
+          className={cn(
+            'min-h-[80px] flex-1 resize-none bg-transparent py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground placeholder:transition-colors',
+            'transition-[color,opacity] duration-200',
+            textareaFocused && 'placeholder:text-muted-foreground/60'
+          )}
         />
 
         <Button
           size="icon"
           onClick={() => void handleSubmit()}
           disabled={isExtracting || (!input.trim() && pendingFiles.length === 0)}
-          className="h-8 w-8 rounded-lg"
+          className={cn(
+            'h-9 w-9 shrink-0 rounded-xl shadow-sm transition-transform duration-300 motion-reduce:transition-none',
+            inputAreaHovered && !isDragOver && 'motion-safe:scale-105'
+          )}
         >
           <Send className="h-4 w-4" />
         </Button>
       </div>
 
       {/* 底部工具栏 */}
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between gap-4 pt-0.5">
         {/* 左侧：标签区域 */}
         <div className="flex flex-wrap items-center gap-1.5">
           {/* 推荐标签 */}
